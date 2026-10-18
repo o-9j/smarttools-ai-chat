@@ -95,6 +95,9 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 			.join("\n---\n");
 
 		const hasImage = imageBytes !== undefined;
+		if (!hasImage && isCorrectionOfCountryGuess(trustedMessages)) {
+			return textEventStream("معك حق، افترضت من نفسي إنك تقصد السياسة المصرية، وهذا كان تخمينًا غلط. تقصد معنى السياسة بشكل عام؟");
+		}
 		// Fail closed: no user content or image reaches the answer model unless
 		// both applicable safety checks return an explicit SAFE result.
 		const textSafety = await checkTextSafety(env, recentUserText);
@@ -197,6 +200,37 @@ async function consumeDailyQuota(request: Request, env: Env, kind: QuotaKind): P
 		.first<{ questions_used: number; images_used: number }>();
 	const used = result ? result[column] : quota.counts[column];
 	return { allowed: Boolean(result), kind, used, resetAt: quota.resetAt };
+}
+
+function isCorrectionOfCountryGuess(messages: ChatMessage[]): boolean {
+	const latestUser = [...messages].reverse().find((message) => message.role === "user")?.content || "";
+	const previousAssistantText = messages
+		.slice(0, -1)
+		.filter((message) => message.role === "assistant")
+		.slice(-3)
+		.map((message) => message.content)
+		.join(" ");
+	const correcting = /(?:منو\s*قالك|ومنهو\s*قالك|مين\s*قالك|من\s*قال\s*لك|ما\s*قلت\s*لك|مو\s*قصدي|ما\s*أقصد|مو\s*هذا\s*قصدي)/u.test(latestUser);
+	const guessedEgypt = /مصر|المصري[ةين]/u.test(previousAssistantText);
+	return correcting && guessedEgypt;
+}
+
+function textEventStream(text: string): Response {
+	const encoder = new TextEncoder();
+	const body = new ReadableStream<Uint8Array>({
+		start(controller) {
+			controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: text })}\n\n`));
+			controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+			controller.close();
+		},
+	});
+	return new Response(body, {
+		headers: {
+			"content-type": "text/event-stream; charset=utf-8",
+			"cache-control": "no-cache",
+			connection: "keep-alive",
+		},
+	});
 }
 
 function decodeImageData(dataUri: string): number[] {
