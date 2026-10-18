@@ -1,22 +1,16 @@
 /**
- * Type definitions for the LLM chat application.
+ * Type definitions for SmartTools AI.
  */
-
 export interface Env {
-	/**
-	 * Binding for the Workers AI API.
-	 */
 	AI: Ai;
-
-	/**
-	 * Binding for static assets.
-	 */
 	ASSETS: { fetch: (request: Request) => Promise<Response> };
+	/**
+	 * Optional D1 database binding used by account authentication.
+	 * Bind a D1 database as "DB" in Cloudflare to enable real accounts.
+	 */
+	DB?: D1Database;
 }
 
-/**
- * Represents a chat message.
- */
 export interface ChatMessage {
 	role: "system" | "user" | "assistant";
 	content: string;
