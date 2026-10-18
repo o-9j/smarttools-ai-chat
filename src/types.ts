@@ -9,6 +9,9 @@ export interface Env {
 	 * Bind a D1 database as "DB" in Cloudflare to enable real accounts.
 	 */
 	DB?: D1Database;
+	/** Optional Resend credentials used for password reset emails. */
+	RESEND_API_KEY?: string;
+	RESET_FROM_EMAIL?: string;
 }
 
 export interface ChatMessage {
