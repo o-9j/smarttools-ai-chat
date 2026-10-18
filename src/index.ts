@@ -1,6 +1,7 @@
 import { Env, ChatMessage } from "./types";
 
 const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
+const VISION_MODEL_ID = "@cf/meta/llama-3.2-11b-vision-instruct";
 const SYSTEM_PROMPT =
 	"You are SmartTools AI, a helpful and friendly assistant. Reply in the same language as the user. If the user writes Arabic, answer naturally in Arabic. Keep answers clear, useful, and concise. Do not use Markdown formatting markers such as **, __, #, or backticks; use clean plain text with simple numbered or bullet lists when helpful.";
 
@@ -57,15 +58,27 @@ export default {
 
 async function handleChatRequest(request: Request, env: Env): Promise<Response> {
 	try {
-		const { messages = [] } = (await request.json()) as { messages: ChatMessage[] };
+		const body = (await request.json()) as { messages?: ChatMessage[]; image?: unknown };
+		const messages = body.messages;
+		if (!Array.isArray(messages) || messages.length > 20 ||
+			messages.some((msg) => !msg || !["system", "user", "assistant"].includes(msg.role) ||
+				typeof msg.content !== "string" || msg.content.length > 20000)) {
+			return json({ error: "invalid_messages" }, 400);
+		}
+		const image = body.image;
+		if (image !== undefined && image !== null && image !== "") {
+			if (typeof image !== "string" || image.length > 2_500_000 ||
+				!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) {
+				return json({ error: "invalid_image" }, 400);
+			}
+		}
 		if (!messages.some((msg) => msg.role === "system")) {
 			messages.unshift({ role: "system", content: SYSTEM_PROMPT });
 		}
-		const stream = await env.AI.run(MODEL_ID, {
-			messages,
-			max_tokens: 1024,
-			stream: true,
-		});
+		const hasImage = typeof image === "string" && image.length > 0;
+		const stream = hasImage
+			? await env.AI.run(VISION_MODEL_ID, { messages, image: image as string, max_tokens: 1024, stream: true })
+			: await env.AI.run(MODEL_ID, { messages, max_tokens: 1024, stream: true });
 		return new Response(stream, {
 			headers: {
 				"content-type": "text/event-stream; charset=utf-8",
