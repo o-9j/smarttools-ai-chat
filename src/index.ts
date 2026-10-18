@@ -6,6 +6,8 @@ const SYSTEM_PROMPT =
 
 const SESSION_COOKIE = "st_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
+// Cloudflare Workers rejects PBKDF2 calls above 100,000 iterations in production.
+const PASSWORD_ITERATIONS = 100_000;
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
@@ -225,7 +227,7 @@ async function passwordDigest(password: string, saltHex: string): Promise<string
 	const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
 	const salt = hexBytes(saltHex);
 	const bits = await crypto.subtle.deriveBits(
-		{ name: "PBKDF2", hash: "SHA-256", salt, iterations: 120000 },
+		{ name: "PBKDF2", hash: "SHA-256", salt, iterations: PASSWORD_ITERATIONS },
 		key,
 		256,
 	);
