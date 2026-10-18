@@ -69,5 +69,5 @@ async function runTool(i){const go=$('#go');go.disabled=true;$('#result').replac
 $('#lang').onchange=e=>{lang=e.target.value;localStorage.setItem('smarttools_lang',lang);localize()};$('#openAI').onclick=()=>{$('#aiPanel').classList.remove('hidden');$('#aiPanel').scrollIntoView({behavior:'smooth'});setTimeout(()=>$('#prompt').focus(),250)};$('#closeAI').onclick=()=>$('#aiPanel').classList.add('hidden');$('#clear').onclick=resetChat;$('#send').onclick=sendAI;$('#prompt').oninput=resizePrompt;$('#prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAI()}};$('#closeTool').onclick=()=>{active=-1;$('#workspace').classList.add('hidden')};$('#premium').onclick=()=>alert(te('ميزة Premium سنفعلها بعد ربط الدفع والمتجر.','Premium will be enabled after payments and store setup.'));
 localize();
 </script>
-</body>
+<script src="account-store.js"></script>\n</body>
 </html>
