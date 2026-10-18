@@ -27,6 +27,9 @@ export default {
 			if (request.method === "POST") return handleChatRequest(request, env);
 			return new Response("Method not allowed", { status: 405 });
 		}
+		if (url.pathname === "/api/quota" && request.method === "GET") {
+			return getDailyQuota(request, env);
+		}
 
 		if (url.pathname === "/api/auth/register" && request.method === "POST") {
 			return register(request, env);
@@ -110,6 +113,11 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 			if (imageSafety !== "safe") return json({ error: "content_not_allowed" }, 422);
 		}
 
+		const quota = await consumeDailyQuota(request, env, hasImage ? "image" : "question");
+		if (!quota.allowed) {
+			return json({ error: "daily_limit_reached", kind: quota.kind, limit: 3, used: quota.used, resetAt: quota.resetAt }, 429);
+		}
+
 		trustedMessages.unshift({ role: "system", content: SYSTEM_PROMPT });
 		const stream = hasImage
 			? await env.AI.run(VISION_MODEL_ID, { messages: trustedMessages, image: imageBytes, max_tokens: 1024, stream: true })
@@ -125,6 +133,69 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 		console.error("Error processing chat request:", error);
 		return json({ error: "Failed to process request" }, 500);
 	}
+}
+
+type QuotaKind = "question" | "image";
+type DailyQuota = { questions: number; images: number; limit: number; resetAt: string };
+
+async function quotaIdentity(request: Request, db: D1Database): Promise<string> {
+	const sessionToken = readCookie(request, SESSION_COOKIE);
+	if (sessionToken) {
+		const sessionHash = await sha256(sessionToken);
+		const now = Math.floor(Date.now() / 1000);
+		const user = await db.prepare("SELECT user_id FROM sessions WHERE token_hash = ?1 AND expires_at > ?2")
+			.bind(sessionHash, now).first<{ user_id: string }>();
+		if (user?.user_id) return "user:" + user.user_id;
+	}
+	const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+	return "ip:" + await sha256("smarttools-daily-quota-v1:" + ip);
+}
+
+function kuwaitDay(now = new Date()): { key: string; resetAt: string } {
+	const parts = new Intl.DateTimeFormat("en-CA", {
+		timeZone: "Asia/Kuwait", year: "numeric", month: "2-digit", day: "2-digit",
+	}).formatToParts(now);
+	const value = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+	const key = `${value("year")}-${value("month")}-${value("day")}`;
+	const [year, month, day] = key.split("-").map(Number);
+	const resetAt = new Date(Date.UTC(year, month - 1, day + 1, -3)).toISOString();
+	return { key, resetAt };
+}
+
+async function readDailyQuota(request: Request, env: Env): Promise<{ db: D1Database; key: string; day: string; resetAt: string; counts: { questions_used: number; images_used: number } }> {
+	const db = requireDb(env);
+	if (db instanceof Response) throw new Error("quota_database_unavailable");
+	const identity = await quotaIdentity(request, db);
+	const { key: day, resetAt } = kuwaitDay();
+	await db.prepare("CREATE TABLE IF NOT EXISTS daily_usage (user_key TEXT NOT NULL, day_key TEXT NOT NULL, questions_used INTEGER NOT NULL DEFAULT 0, images_used INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (user_key, day_key))").run();
+	await db.prepare("DELETE FROM daily_usage WHERE user_key = ?1 AND day_key <> ?2").bind(identity, day).run();
+	const counts = await db.prepare("SELECT questions_used, images_used FROM daily_usage WHERE user_key = ?1 AND day_key = ?2")
+		.bind(identity, day).first<{ questions_used: number; images_used: number }>();
+	return { db, key: identity, day, resetAt, counts: counts || { questions_used: 0, images_used: 0 } };
+}
+
+async function getDailyQuota(request: Request, env: Env): Promise<Response> {
+	try {
+		const quota = await readDailyQuota(request, env);
+		return json({ questions: quota.counts.questions_used, images: quota.counts.images_used, limit: 3, resetAt: quota.resetAt });
+	} catch (error) {
+		console.error("Daily quota lookup failed:", error);
+		return json({ error: "quota_unavailable" }, 503);
+	}
+}
+
+async function consumeDailyQuota(request: Request, env: Env, kind: QuotaKind): Promise<{ allowed: boolean; kind: QuotaKind; used: number; resetAt: string }> {
+	const quota = await readDailyQuota(request, env);
+	const column = kind === "image" ? "images_used" : "questions_used";
+	const insertValues = kind === "image" ? "0, 1" : "1, 0";
+	const result = await quota.db.prepare(
+		`INSERT INTO daily_usage (user_key, day_key, questions_used, images_used, updated_at) VALUES (?1, ?2, ${insertValues}, ?3) ` +
+		`ON CONFLICT(user_key, day_key) DO UPDATE SET ${column} = ${column} + 1, updated_at = ?3 WHERE ${column} < 3 ` +
+		"RETURNING questions_used, images_used",
+	).bind(quota.key, quota.day, Math.floor(Date.now() / 1000))
+		.first<{ questions_used: number; images_used: number }>();
+	const used = result ? result[column] : quota.counts[column];
+	return { allowed: Boolean(result), kind, used, resetAt: quota.resetAt };
 }
 
 function decodeImageData(dataUri: string): number[] {
