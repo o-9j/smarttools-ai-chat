@@ -168,7 +168,7 @@ async function readDailyQuota(request: Request, env: Env): Promise<{ db: D1Datab
 	const identity = await quotaIdentity(request, db);
 	const { key: day, resetAt } = kuwaitDay();
 	await db.prepare("CREATE TABLE IF NOT EXISTS daily_usage (user_key TEXT NOT NULL, day_key TEXT NOT NULL, questions_used INTEGER NOT NULL DEFAULT 0, images_used INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (user_key, day_key))").run();
-	await db.prepare("DELETE FROM daily_usage WHERE user_key = ?1 AND day_key <> ?2").bind(identity, day).run();
+	await db.prepare("DELETE FROM daily_usage WHERE day_key <> ?1").bind(day).run();
 	const counts = await db.prepare("SELECT questions_used, images_used FROM daily_usage WHERE user_key = ?1 AND day_key = ?2")
 		.bind(identity, day).first<{ questions_used: number; images_used: number }>();
 	return { db, key: identity, day, resetAt, counts: counts || { questions_used: 0, images_used: 0 } };
