@@ -93,19 +93,46 @@ bn:['ছবি তুলুন','ছবি বাছুন','চার কোণ
 function scanCopy(){return SCAN_COPY[lang]||SCAN_COPY.en}
 function scannerUI(){const t=scanCopy();return '<div class="scan-actions"><button class="outline" id="scanCamera">'+t[0]+'</button><button class="outline" id="scanChoose">'+t[1]+'</button></div><input hidden id="scanPhoto" type="file" accept="image/*" capture="environment"><input hidden id="scanFile" type="file" accept="image/*"><p>'+t[2]+'</p><div id="scanEditor" class="hidden"><div class="scan-stage"><canvas id="scanCanvas"></canvas><div id="scanHandles"></div></div><div class="scan-actions"><button class="outline" id="scanAuto">'+t[3]+'</button><button class="primary" id="scanPreview">'+t[4]+'</button></div></div><div id="scanOutput" class="hidden"><img id="scanResult" alt="'+t[4]+'"><div class="scan-actions"><button class="outline" id="scanEdit">'+t[5]+'</button><button class="primary" id="scanPDF">'+t[6]+'</button><button class="outline" id="scanJPG">'+t[7]+'</button></div></div>'}
 function validScanQuad(p){return p.every((a,i)=>{const b=p[(i+1)%4],c=p[(i+2)%4];return (b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x)>0.001})}
-function suggestedPaper(source){
- const c=document.createElement('canvas'),s=Math.min(1,360/Math.max(source.width,source.height));c.width=Math.round(source.width*s);c.height=Math.round(source.height*s);
- const ctx=c.getContext('2d');ctx.drawImage(source,0,0,c.width,c.height);const w=c.width,h=c.height,d=ctx.getImageData(0,0,w,h).data,seen=new Uint8Array(w*h);let best=[];
- // Locate the largest connected bright paper-like region; always let the user review.
- for(let k=0;k<w*h;k++){if(seen[k])continue;seen[k]=1;if(Math.min(d[k*4],d[k*4+1],d[k*4+2])<150)continue;
- const q=[k];for(let j=0;j<q.length;j++){const a=q[j],x=a%w,y=Math.floor(a/w);for(const b of [x>0?a-1:-1,x<w-1?a+1:-1,y>0?a-w:-1,y<h-1?a+w:-1]){if(b<0||seen[b])continue;seen[b]=1;if(Math.min(d[b*4],d[b*4+1],d[b*4+2])>=150)q.push(b)}}
- if(q.length>best.length)best=q;
+
+function detectPaperPixels(rgba,w,h){
+ const n=w*h,raw=new Float32Array(n),g=new Float32Array(n),hist=new Uint32Array(256);
+ for(let i=0;i<n;i++)raw[i]=.299*rgba[i*4]+.587*rgba[i*4+1]+.114*rgba[i*4+2];
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){let sum=0,count=0;for(let yy=Math.max(0,y-1);yy<=Math.min(h-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(w-1,x+1);xx++){sum+=raw[yy*w+xx];count++}const i=y*w+x;g[i]=sum/count;hist[Math.round(g[i])]++}
+ const percentile=f=>{let count=0;for(let i=0;i<256;i++){count+=hist[i];if(count>=n*f)return i}return 255};
+ const lo=percentile(.02),hi=percentile(.98),range=hi-lo;
+ if(range<8)return null;
+ let best=null,bestScore=0;
+ const queue=new Int32Array(n);
+ const area=p=>Math.abs(p.reduce((s,a,i)=>{const b=p[(i+1)%4];return s+a.x*b.y-a.y*b.x},0))/2;
+ const sample=(x,y)=>g[Math.max(0,Math.min(h-1,Math.round(y)))*w+Math.max(0,Math.min(w-1,Math.round(x)))];
+ for(const fraction of [.22,.38,.54,.70,.84])for(const polarity of [1,-1]){
+  const threshold=lo+range*fraction,seen=new Uint8Array(n),inside=i=>polarity*(g[i]-threshold)>0;
+  for(let seed=0;seed<n;seed++){
+   if(seen[seed])continue;seen[seed]=1;if(!inside(seed))continue;
+   let head=0,tail=1;queue[0]=seed;let minSum=Infinity,maxSum=-Infinity,minDiff=Infinity,maxDiff=-Infinity,p=[null,null,null,null],border=0;
+   while(head<tail){const i=queue[head++],x=i%w,y=Math.floor(i/w),sum=x+y,diff=x-y;
+    if(sum<minSum){minSum=sum;p[0]={x,y}}if(diff>maxDiff){maxDiff=diff;p[1]={x,y}}if(sum>maxSum){maxSum=sum;p[2]={x,y}}if(diff<minDiff){minDiff=diff;p[3]={x,y}}
+    if(x===0||y===0||x===w-1||y===h-1)border++;
+    for(const j of [x>0?i-1:-1,x<w-1?i+1:-1,y>0?i-w:-1,y<h-1?i+w:-1]){if(j<0||seen[j])continue;seen[j]=1;if(inside(j))queue[tail++]=j}
+   }
+   if(tail<n*.025||tail>n*.9||border>Math.min(w,h)*.1)continue;
+   const a=area(p),norm=p.map(v=>({x:v.x/(w-1),y:v.y/(h-1)}));
+   if(a<n*.03||a>n*.88||tail/a<.65||tail/a>1.18||!validScanQuad(norm))continue;
+   // Require contrast along all four candidate edges, rejecting isolated bright patches.
+   let support=0,weakest=1;
+   for(let i=0;i<4;i++){const a=p[i],b=p[(i+1)%4],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(len<Math.min(w,h)*.08){weakest=0;break}const nx=-dy/len,ny=dx/len;let good=0;for(let k=1;k<=24;k++){const t=k/25,x=a.x+dx*t,y=a.y+dy*t;let contrast=0;for(const offset of [-1,0,1]){const xx=x+nx*offset,yy=y+ny*offset;contrast=Math.max(contrast,Math.abs(sample(xx+nx*2,yy+ny*2)-sample(xx-nx*2,yy-ny*2)))}if(contrast>Math.max(3,range*.09))good++}support+=good/24;weakest=Math.min(weakest,good/24)}
+   if(weakest<.38)continue;
+   const score=(support/4)*Math.sqrt(a/n)*Math.min(1,tail/a);
+   if(score>bestScore){bestScore=score;best=norm}
+  }
  }
- if(best.length<w*h*.12||best.length>w*h*.94)return null;
- const pts=best.map(k=>({x:(k%w)/(w-1),y:Math.floor(k/w)/(h-1)}));
- const extreme=fn=>pts.reduce((a,b)=>fn(b)<fn(a)?b:a);
- const p=[extreme(p=>p.x+p.y),extreme(p=>p.y-p.x),extreme(p=>-p.x-p.y),extreme(p=>p.x-p.y)];
- return validScanQuad(p)?p:null;
+ return best;
+}
+function suggestedPaper(source){
+ const c=document.createElement('canvas'),s=Math.min(1,240/Math.max(source.width,source.height));
+ c.width=Math.max(2,Math.round(source.width*s));c.height=Math.max(2,Math.round(source.height*s));
+ const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(source,0,0,c.width,c.height);
+ return detectPaperPixels(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height);
 }
 function rectifyPaper(source,points){
  if(!validScanQuad(points))throw Error(scanCopy()[10]);
@@ -129,7 +156,7 @@ function initScanner(){
  let source=null,points=[],cropped=null,request=0,stream=null,timer=null,starting=false,disposed=false,cameraEpoch=0,last=null,stable=0,busy=false,exporting=false;
  const pages=[],urls=[];
  const live=document.createElement('div');live.className='hidden';live.innerHTML='<div class="scan-live"><video muted autoplay playsinline></video><canvas></canvas></div><p class="scan-live-status" role="status"></p><div class="scan-actions"><label><input type="checkbox" checked style="width:auto"> '+(ar?'التقاط تلقائي عند ثبات الورقة':'Auto-capture when paper is steady')+'</label><button class="primary" data-capture>'+(ar?'التقاط الآن':'Capture now')+'</button><button class="outline" data-stop>'+(ar?'إغلاق الكاميرا':'Close camera')+'</button></div>';
- editor.before(live);const video=live.querySelector('video'),overlay=live.querySelector('canvas'),message=live.querySelector('p'),autoCapture=live.querySelector('input');
+ editor.before(live);live.style.scrollMarginTop='16px';const video=live.querySelector('video'),overlay=live.querySelector('canvas'),message=live.querySelector('p'),autoCapture=live.querySelector('input');
  const add=document.createElement('button');add.className='primary';add.textContent=ar?'اعتماد الصفحة وإضافة أخرى':'Keep page & add another';output.querySelector('.scan-actions').prepend(add);
  const bundle=document.createElement('div');bundle.className='scan-pages hidden';bundle.innerHTML='<h3></h3><div class="scan-thumbnails"></div><button class="primary" data-export>'+(ar?'حفظ جميع الصفحات PDF':'Save all pages as PDF')+'</button>';output.after(bundle);
  const pageList=bundle.querySelector('.scan-thumbnails'),exportButton=bundle.querySelector('[data-export]');
@@ -152,14 +179,14 @@ function initScanner(){
  function capture(detected){if(!stream||!video.videoWidth||busy)return;const next=document.createElement('canvas'),s=Math.min(1,2400/Math.max(video.videoWidth,video.videoHeight));next.width=Math.round(video.videoWidth*s);next.height=Math.round(video.videoHeight*s);next.getContext('2d').drawImage(video,0,0,next.width,next.height);stop();request++;prepare(next,detected);if(detected)preview()}
  function tick(){if(!current()||!stream||video.readyState<2)return;const frame=document.createElement('canvas'),s=Math.min(1,360/Math.max(video.videoWidth,video.videoHeight));frame.width=Math.round(video.videoWidth*s);frame.height=Math.round(video.videoHeight*s);frame.getContext('2d').drawImage(video,0,0,frame.width,frame.height);const found=suggestedPaper(frame);
  overlay.width=frame.width;overlay.height=frame.height;const ctx=overlay.getContext('2d');
- if(!found){last=null;stable=0;message.textContent=ar?'ضع الورقة كاملة على سطح أغمق، مع إضاءة جيدة.':'Place the whole paper on a darker surface in good light.';return}
+ if(!found){last=null;stable=0;message.textContent=ar?'خلّ الحواف الأربع داخل الكاميرا وخلفيتها مختلفة اللون. زِد الإضاءة إذا كانت الصورة مظلمة.':'Keep all four edges visible against a contrasting background. Improve lighting if needed.';return}
  ctx.strokeStyle='#64f5cb';ctx.lineWidth=2;ctx.beginPath();found.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p.x*frame.width,p.y*frame.height));ctx.closePath();ctx.stroke();
- const drift=last?Math.max(...found.map((p,i)=>Math.hypot(p.x-last[i].x,p.y-last[i].y))):1;stable=drift<.012?stable+1:0;last=found;
- message.textContent=ar?'تم تحديد الورقة — ثبّت الكاميرا…':'Paper detected — hold steady…';
+ const drift=last?Math.max(...found.map((p,i)=>Math.hypot(p.x-last[i].x,p.y-last[i].y))):1;if(drift<.018){stable++}else{stable=0;last=found}
+ message.textContent=ar?'تم تحديد الحواف — ثبّت الكاميرا… '+Math.min(100,Math.round(stable/5*100))+'%':'Edges detected — hold steady… '+Math.min(100,Math.round(stable/5*100))+'%';
  if(autoCapture.checked&&stable>=5)capture(found);
  }
  async function start(){if(starting||stream||busy||exporting)return;request++;stop();const epoch=cameraEpoch;starting=true;status.textContent=ar?'اسمح باستخدام الكاميرا لبدء المسح.':'Allow camera access to start scanning.';
- try{if(!navigator.mediaDevices?.getUserMedia)throw Error('unsupported');const next=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1440}}});if(!current()||epoch!==cameraEpoch){next.getTracks().forEach(t=>t.stop());return}stream=next;video.srcObject=stream;live.classList.remove('hidden');await video.play();if(!current()||epoch!==cameraEpoch)return;editor.classList.add('hidden');output.classList.add('hidden');cropped=null;status.textContent='';timer=setInterval(tick,250)}
+ try{if(!navigator.mediaDevices?.getUserMedia)throw Error('unsupported');const next=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1440}}});if(!current()||epoch!==cameraEpoch){next.getTracks().forEach(t=>t.stop());return}stream=next;video.srcObject=stream;live.classList.remove('hidden');live.scrollIntoView({behavior:'smooth',block:'start'});await video.play();if(!current()||epoch!==cameraEpoch)return;editor.classList.add('hidden');output.classList.add('hidden');cropped=null;status.textContent='';timer=setInterval(tick,250)}
  catch(err){if(current()&&epoch===cameraEpoch){stop();status.textContent=ar?'تعذّر فتح الكاميرا المباشرة. اسمح بالكاميرا من إعدادات المتصفح، أو استخدم «صوّر الورقة» أدناه.':'Live camera unavailable. Allow camera access in browser settings or use Take photo below.'}}
  finally{if(epoch===cameraEpoch)starting=false}}
  const cameraButton=$('#scanCamera');cameraButton.textContent=ar?'مسح بالكاميرا مباشرة':'Live document scanner';cameraButton.onclick=start;
