@@ -211,8 +211,8 @@ function isCorrectionOfCountryGuess(messages: ChatMessage[]): boolean {
 		.map((message) => message.content)
 		.join(" ");
 	const correcting = /(?:منو\s*قالك|ومنهو\s*قالك|مين\s*قالك|من\s*قال\s*لك|ما\s*قلت\s*لك|مو\s*قصدي|ما\s*أقصد|مو\s*هذا\s*قصدي)/u.test(latestUser);
-	const guessedEgypt = /مصر|المصري[ةين]/u.test(previousAssistantText);
-	return correcting && guessedEgypt;
+	const mentionsEgypt = /مصر|المصري[ةين]/u.test(latestUser + " " + previousAssistantText);
+	return correcting && mentionsEgypt;
 }
 
 function textEventStream(text: string): Response {
