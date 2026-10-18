@@ -8,9 +8,10 @@ const SESSION_COOKIE = "st_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Cloudflare Workers rejects PBKDF2 calls above 100,000 iterations in production.
 const PASSWORD_ITERATIONS = 100_000;
+const RESET_LINK_ORIGIN = "https://smarttools-ai-chat.dpfgmkzzk2.workers.dev";
 
 export default {
-	async fetch(request: Request, env: Env): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 
 		if (url.pathname === "/" || !url.pathname.startsWith("/api/")) {
@@ -27,6 +28,12 @@ export default {
 		}
 		if (url.pathname === "/api/auth/login" && request.method === "POST") {
 			return login(request, env);
+		}
+		if (url.pathname === "/api/auth/forgot-password" && request.method === "POST") {
+			return forgotPassword(request, env, ctx);
+		}
+		if (url.pathname === "/api/auth/reset-password" && request.method === "POST") {
+			return resetPassword(request, env);
 		}
 		if (url.pathname === "/api/auth/logout" && request.method === "POST") {
 			return logout(request, env);
@@ -149,6 +156,87 @@ async function login(request: Request, env: Env): Promise<Response> {
 	} catch (error) {
 		console.error("Login error:", error);
 		return json({ error: "login_failed", message: "Could not sign in." }, 500);
+	}
+}
+
+async function forgotPassword(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	const db = requireDb(env);
+	if (db instanceof Response) return db;
+	if (!env.RESEND_API_KEY || !env.RESET_FROM_EMAIL) return json({ error: "email_not_configured" }, 503);
+	try {
+		const body = (await request.json()) as { email?: string };
+		const email = normalizeEmail(body.email);
+		if (!validEmail(email)) return json({ error: "invalid_email" }, 400);
+
+		// Use the same public response for existing and unknown addresses.
+		const accepted = json({ ok: true, message: "If the account exists, a reset link will be sent." });
+		const user = await db.prepare("SELECT id FROM users WHERE email = ?1").bind(email).first<{ id: string }>();
+		if (!user) return accepted;
+
+		const now = Math.floor(Date.now() / 1000);
+		const recent = await db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?1 AND id LIKE 'password-reset:%' AND created_at > ?2").bind(user.id, now - 3600).first<{ count: number }>();
+		if ((recent?.count || 0) >= 3) return accepted;
+
+		const token = randomHex(32);
+		const tokenHash = await sha256("password-reset:" + token);
+		const resetId = "password-reset:" + user.id + ":" + crypto.randomUUID();
+		await db.prepare("INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5)").bind(resetId, user.id, tokenHash, now + 1800, now).run();
+
+		const resetUrl = new URL("/", RESET_LINK_ORIGIN);
+		resetUrl.searchParams.set("reset", token);
+		ctx.waitUntil((async () => {
+			try {
+				const response = await fetch("https://api.resend.com/emails", {
+					method: "POST",
+					headers: { "Authorization": "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
+					body: JSON.stringify({
+						from: env.RESET_FROM_EMAIL,
+						to: [email],
+						subject: "Reset your SmartTools AI password",
+						html: '<p>We received a request to reset your SmartTools AI password.</p><p><a href="' + resetUrl.toString() + '">Reset your password</a></p><p>This link expires in 30 minutes. If you did not request this, you can ignore this email.</p>',
+					}),
+				});
+				if (!response.ok) {
+					console.error("Password reset email failed with status:", response.status);
+					await db.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(tokenHash).run();
+				}
+			} catch (error) {
+				console.error("Password reset email delivery failed:", error);
+				await db.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(tokenHash).run();
+			}
+		})());
+		return accepted;
+	} catch (error) {
+		console.error("Password reset request error:", error);
+		return json({ error: "reset_request_failed" }, 500);
+	}
+}
+
+async function resetPassword(request: Request, env: Env): Promise<Response> {
+	const db = requireDb(env);
+	if (db instanceof Response) return db;
+	try {
+		const body = (await request.json()) as { token?: string; password?: string };
+		const token = String(body.token || "");
+		const password = String(body.password || "");
+		if (password.length < 8) return json({ error: "weak_password" }, 400);
+		if (!/^[0-9a-f]{64}$/i.test(token)) return json({ error: "invalid_reset_token" }, 400);
+
+		const now = Math.floor(Date.now() / 1000);
+		const tokenHash = await sha256("password-reset:" + token);
+		const reset = await db.prepare("DELETE FROM sessions WHERE token_hash = ?1 AND id LIKE 'password-reset:%' AND expires_at > ?2 RETURNING user_id").bind(tokenHash, now).first<{ user_id: string }>();
+		if (!reset) return json({ error: "invalid_reset_token" }, 400);
+
+		const salt = randomHex(16);
+		const passwordHash = await passwordDigest(password, salt);
+		await db.batch([
+			db.prepare("UPDATE users SET password_hash = ?1, password_salt = ?2 WHERE id = ?3").bind(passwordHash, salt, reset.user_id),
+			db.prepare("DELETE FROM sessions WHERE user_id = ?1").bind(reset.user_id),
+		]);
+		return json({ ok: true });
+	} catch (error) {
+		console.error("Password reset error:", error);
+		return json({ error: "reset_failed" }, 500);
 	}
 }
 
