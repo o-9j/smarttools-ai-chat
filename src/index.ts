@@ -70,9 +70,15 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 			return json({ error: "invalid_messages" }, 400);
 		}
 		const image = body.image;
+		let imageBytes: number[] | undefined;
 		if (image !== undefined && image !== null && image !== "") {
 			if (typeof image !== "string" || image.length > 2_500_000 ||
 				!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) {
+				return json({ error: "invalid_image" }, 400);
+			}
+			try {
+				imageBytes = decodeImageData(image);
+			} catch {
 				return json({ error: "invalid_image" }, 400);
 			}
 		}
@@ -86,7 +92,7 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 			.map((msg) => msg.content.slice(0, 1600))
 			.join("\n---\n");
 
-		const hasImage = typeof image === "string" && image.length > 0;
+		const hasImage = imageBytes !== undefined;
 		// Fail closed: no user content or image reaches the answer model unless
 		// both applicable safety checks return an explicit SAFE result.
 		const textSafety = await checkTextSafety(env, recentUserText);
@@ -99,14 +105,14 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 				console.error("Vision model agreement check failed:", error);
 				return json({ error: "image_safety_unavailable" }, 503);
 			}
-			const imageSafety = await checkImageSafety(env, image as string, latestUserMessage.content);
+			const imageSafety = await checkImageSafety(env, imageBytes!, latestUserMessage.content);
 			if (imageSafety === "unavailable") return json({ error: "safety_check_unavailable" }, 503);
 			if (imageSafety !== "safe") return json({ error: "content_not_allowed" }, 422);
 		}
 
 		trustedMessages.unshift({ role: "system", content: SYSTEM_PROMPT });
 		const stream = hasImage
-			? await env.AI.run(VISION_MODEL_ID, { messages: trustedMessages, image: image as string, max_tokens: 1024, stream: true })
+			? await env.AI.run(VISION_MODEL_ID, { messages: trustedMessages, image: imageBytes, max_tokens: 1024, stream: true })
 			: await env.AI.run(MODEL_ID, { messages: trustedMessages, max_tokens: 1024, stream: true });
 		return new Response(stream, {
 			headers: {
@@ -119,6 +125,15 @@ async function handleChatRequest(request: Request, env: Env): Promise<Response> 
 		console.error("Error processing chat request:", error);
 		return json({ error: "Failed to process request" }, 500);
 	}
+}
+
+function decodeImageData(dataUri: string): number[] {
+	const separator = dataUri.indexOf(",");
+	if (separator < 0) throw new Error("Invalid image data URL");
+	const binary = atob(dataUri.slice(separator + 1));
+	const bytes = new Array<number>(binary.length);
+	for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+	return bytes;
 }
 
 async function ensureVisionTermsAccepted(env: Env): Promise<void> {
@@ -155,7 +170,7 @@ async function checkTextSafety(env: Env, content: string): Promise<"safe" | "uns
 	}
 }
 
-async function checkImageSafety(env: Env, image: string, context: string): Promise<"safe" | "unsafe" | "unavailable"> {
+async function checkImageSafety(env: Env, image: number[], context: string): Promise<"safe" | "unsafe" | "unavailable"> {
 	try {
 		const result = await env.AI.run(VISION_MODEL_ID, {
 			messages: [
