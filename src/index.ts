@@ -15,7 +15,7 @@ const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
 
 // Default system prompt
 const SYSTEM_PROMPT =
-	"You are a helpful, friendly assistant. Provide concise and accurate responses.";
+	"You are SmartTools AI, a helpful and friendly assistant. Reply in the same language as the user. If the user writes Arabic, answer naturally in Arabic. Keep answers clear, useful, and concise. Do not use Markdown formatting markers such as **, __, #, or backticks; use clean plain text with simple numbered or bullet lists when helpful.";
 
 export default {
 	/**
