@@ -5,12 +5,12 @@
   .st-modal.hidden{display:none!important}.st-modal-wrap.hidden{display:none!important}
   .st-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.st-modal-head h2{margin:0}
   .st-close{width:42px;height:42px;border-radius:12px;border:1px solid #49688f;background:#101d33;color:white;font-size:20px}
-  .st-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.st-tab{padding:11px;border-radius:12px;border:1px solid #395779;background:#0d1a30;color:#b7cbe5}.st-tab.active{background:#254b79;color:#fff;border-color:#5caeff}
+  .st-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.st-tab{padding:11px;border-radius:12px;border:1px solid #395779;background:#0d1a30;color:#b7cbe5}.st-tab.active{background:linear-gradient(120deg,#247db8,#c44f8b);color:#fff;border-color:#ec82bb}
   .st-field{display:block;margin:12px 0}.st-field span{display:block;font-size:12px;color:#b9cce4;margin-bottom:6px}.st-field input{width:100%;padding:13px;border-radius:12px;border:1px solid #496488;background:#0a1528;color:#fff}
   .st-wide{width:100%;margin-top:8px}.st-status{min-height:22px;margin-top:10px;font-size:12px;color:#a9c8eb;line-height:1.6}.st-link{display:block;margin:2px 0 8px;padding:4px 0;border:0;background:transparent;color:#9bcaff;font-size:12px;text-align:start}.st-link:hover{color:#f5a0cb}
   .st-account-card{padding:15px;border-radius:16px;border:1px solid #35557d;background:#0d1a30;margin:10px 0}.st-account-card strong{display:block;font-size:17px}.st-account-card small{display:block;color:#9fb6d2;margin-top:4px}
   .st-store-intro{padding:13px;border-radius:14px;background:#102844;border:1px solid #2c5e8d;color:#bfe1ff;font-size:13px;line-height:1.7;margin-bottom:12px}
-  .st-plans{display:grid;gap:10px}.st-plan{padding:16px;border-radius:17px;border:1px solid #36567f;background:#0d1a30}.st-plan.best{border-color:#736dff;box-shadow:0 0 0 1px rgba(115,109,255,.25)}.st-plan-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.st-plan h3{margin:0}.st-price{font-size:22px;font-weight:900;color:#85caff}.st-plan p{font-size:12px;color:#9fb5d0;margin:8px 0 12px;line-height:1.6}.st-free{font-size:12px;color:#9fc0df;margin:10px 0 14px}
+  .st-plans{display:grid;gap:10px}.st-plan{padding:16px;border-radius:17px;border:1px solid #36567f;background:#0d1a30}.st-plan.best{border-color:#e878b4;box-shadow:0 0 0 1px rgba(244,114,182,.22)}.st-plan-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.st-plan h3{margin:0}.st-price{font-size:22px;font-weight:900;color:#85caff}.st-plan p{font-size:12px;color:#9fb5d0;margin:8px 0 12px;line-height:1.6}.st-free{font-size:12px;color:#9fc0df;margin:10px 0 14px}
   @media(max-width:560px){.actions{flex-wrap:wrap}.actions select{min-width:145px}.st-modal{padding:16px}}
   `;
   const style=document.createElement('style');style.textContent=css;document.head.appendChild(style);
@@ -171,6 +171,8 @@
       else if(e.code==='weak_password') status.textContent=accountText('weak',isEn()?'Password must be at least 8 characters.':'كلمة المرور لازم تكون 8 أحرف على الأقل.');
       else if(e.code==='email_not_configured') status.textContent=accountText('resetUnavailable',isEn()?'Password reset email is not configured yet.':'استعادة كلمة المرور تحتاج إعداد البريد أولاً.');
       else if(e.code==='invalid_reset_token') status.textContent=accountText('resetInvalid',isEn()?'This reset link is invalid or expired. Request a new one.':'رابط الاستعادة غير صالح أو منتهي. اطلب رابطاً جديداً.');
+      else if(mode==='forgot') status.textContent=accountText('resetUnavailable',isEn()?'Password reset email is not configured yet.':'استعادة كلمة المرور تحتاج إعداد البريد أولاً.');
+      else if(mode==='reset') status.textContent=accountText('resetInvalid',isEn()?'This reset link is invalid or expired. Request a new one.':'رابط الاستعادة غير صالح أو منتهي. اطلب رابطاً جديداً.');
       else status.textContent=accountText('error',isEn()?'Something went wrong.':'صار خطأ، جرّب مرة ثانية.');
     }
   };
