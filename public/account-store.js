@@ -62,7 +62,8 @@
   document.body.appendChild(wrap);
 
   const q=s=>document.querySelector(s);
-  let mode='login', currentUser=null;
+  let mode='login', currentUser=null, resetToken=new URLSearchParams(location.search).get('reset')||'';
+  if(resetToken)history.replaceState({},'',location.pathname+location.hash);
 
   function isEn(){return typeof lang!=='undefined' && lang==='en'}
   function accountText(key,fallback){return ACCOUNT_WORDS[typeof lang!=='undefined'?lang:'ar']?.[key]||fallback}
@@ -155,9 +156,8 @@
         return;
       }
       if(mode==='reset'){
-        const token=new URLSearchParams(location.search).get('reset')||'';
-        await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({token,password})});
-        history.replaceState({},'',location.pathname+location.hash);setMode('login');
+        await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({token:resetToken,password})});
+        resetToken='';setMode('login');
         status.textContent=accountText('resetSuccess',isEn()?'Password updated. Sign in with your new password.':'تم تحديث كلمة المرور. سجّل الدخول بكلمة المرور الجديدة.');
         return;
       }
@@ -197,5 +197,5 @@
   const langSelect=document.getElementById('lang');
   if(langSelect) langSelect.addEventListener('change',()=>setTimeout(localizeAccountStore,0));
   setMode('login');refreshUser();
-  if(new URLSearchParams(location.search).has('reset')){setMode('reset');show('auth')}
+  if(resetToken){setMode('reset');show('auth')}
 })();
