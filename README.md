@@ -5,6 +5,7 @@ This repository is the **smarttools-ai-chat** Worker, not the separate **smartto
 ## Implemented
 - AI chat endpoint: `POST /api/chat`
 - Account endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+- Password recovery: `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
 - Informational plan list: `GET /api/store/plans`
 - Secure, HttpOnly session cookie and PBKDF2 password hashes
 
@@ -25,12 +26,16 @@ The separately created D1 database is named `smarttools-users`. Its initial `use
 3. Deploy **smarttools-ai-chat** and verify `/api/auth/me` responds with `{"user":null}` when logged out. Then test registration, login, and logout.
 4. Do not assume binding the separate `smarttools-ai-api` Worker automatically binds this Worker; bindings are configured independently.
 
+## Password reset email setup
+
+Password reset emails are sent through Resend. In the Cloudflare Worker settings, configure `RESEND_API_KEY` as a secret and `RESET_FROM_EMAIL` as a sender address verified in Resend. Never commit the API key or share it in chat. Reset links expire after 30 minutes, can be used once, and the password reset invalidates existing sessions. The request response does not reveal whether an email address has an account.
+
 ## Security and launch checklist
 
 - Rate-limit registration, login, and AI chat before public launch.
 - Validate requests and use origin/CSRF protections for cookie-authenticated state changes.
 - Do not grant paid plans based on client input. Validate Apple/Google store purchase notifications server-side.
-- Verify email ownership, implement password recovery, account deletion, and privacy/terms before launch.
+- Verify email ownership, account deletion, and privacy/terms before launch.
 - Configure CORS and a suitable mobile authentication strategy if calling this API from Expo/React Native.
 
 ## Development
