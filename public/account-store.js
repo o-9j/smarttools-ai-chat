@@ -63,28 +63,30 @@
   let mode='login', currentUser=null;
 
   function isEn(){return typeof lang!=='undefined' && lang==='en'}
+  function accountText(key,fallback){return ACCOUNT_WORDS[typeof lang!=='undefined'?lang:'ar']?.[key]||fallback}
+  function accountText(key,fallback){return ACCOUNT_WORDS[typeof lang!=='undefined'?lang:'ar']?.[key]||fallback}
+  const ACCOUNT_WORDS={"zh":{"store":"商店","signin":"登录","account":"账户","register":"创建账户","name":"姓名","email":"电子邮件","password":"密码","create":"创建账户","logout":"退出登录","storeTitle":"SmartTools AI 商店","intro":"免费使用 SmartTools AI 并观看广告，或选择 Premium 以移除广告并解锁更多功能。","freeText":"免费方案：基础工具 + 广告。","weekly":"每周","weeklyText":"Premium 有效期一周。","monthly":"每月","monthlyText":"Premium 有效期一个月。","yearly":"每年","yearlyText":"年度最佳优惠。","subscribe":"订阅","plan":"方案：","free":"免费","wait":"稍等…","signinSub":"请先登录再订阅。","db":"账户数据库需要先在 Cloudflare 中启用。","exists":"此邮箱已注册。","badLogin":"邮箱或密码不正确。","weak":"密码至少需要 8 个字符。","error":"发生错误，请重试。","created":"注册成功","signed":"登录成功","language":"语言"},"hi":{"store":"स्टोर","signin":"साइन इन","account":"खाता","register":"खाता बनाएँ","name":"नाम","email":"ईमेल","password":"पासवर्ड","create":"खाता बनाएँ","logout":"साइन आउट","storeTitle":"SmartTools AI स्टोर","intro":"SmartTools AI को विज्ञापनों के साथ मुफ़्त इस्तेमाल करें या विज्ञापन हटाने और अतिरिक्त सुविधाएँ पाने के लिए Premium चुनें।","freeText":"मुफ़्त योजना: मुख्य टूल + विज्ञापन।","weekly":"साप्ताहिक","weeklyText":"एक सप्ताह के लिए Premium।","monthly":"मासिक","monthlyText":"एक महीने के लिए Premium।","yearly":"वार्षिक","yearlyText":"एक वर्ष के लिए सबसे अच्छा मूल्य।","subscribe":"सदस्यता लें","plan":"योजना:","free":"मुफ़्त","wait":"कृपया प्रतीक्षा करें…","signinSub":"सदस्यता लेने के लिए पहले साइन इन करें।","db":"पहले Cloudflare में खाता डेटाबेस चालू करें।","exists":"यह ईमेल पहले से पंजीकृत है।","badLogin":"ईमेल या पासवर्ड गलत है।","weak":"पासवर्ड कम से कम 8 अक्षरों का होना चाहिए।","error":"कुछ गड़बड़ हुई। फिर कोशिश करें।","created":"खाता बन गया","signed":"साइन इन सफल","language":"भाषा"},"es":{"store":"Tienda","signin":"Iniciar sesión","account":"Cuenta","register":"Crear cuenta","name":"Nombre","email":"Correo electrónico","password":"Contraseña","create":"Crear cuenta","logout":"Cerrar sesión","storeTitle":"Tienda de SmartTools AI","intro":"Usa SmartTools AI gratis con anuncios o elige Premium para quitarlos y desbloquear funciones adicionales.","freeText":"Plan gratuito: herramientas principales + anuncios.","weekly":"Semanal","weeklyText":"Premium durante una semana.","monthly":"Mensual","monthlyText":"Premium durante un mes.","yearly":"Anual","yearlyText":"Mejor precio por un año.","subscribe":"Suscribirse","plan":"Plan:","free":"Gratis","wait":"Espera…","signinSub":"Inicia sesión primero para suscribirte.","db":"Primero hay que activar la base de datos de cuentas en Cloudflare.","exists":"Este correo ya está registrado.","badLogin":"El correo o la contraseña no son correctos.","weak":"La contraseña debe tener al menos 8 caracteres.","error":"Algo salió mal. Inténtalo de nuevo.","created":"Cuenta creada","signed":"Sesión iniciada","language":"Idioma"},"fr":{"store":"Boutique","signin":"Se connecter","account":"Compte","register":"Créer un compte","name":"Nom","email":"E-mail","password":"Mot de passe","create":"Créer un compte","logout":"Se déconnecter","storeTitle":"Boutique SmartTools AI","intro":"Utilisez SmartTools AI gratuitement avec des publicités ou choisissez Premium pour les supprimer et débloquer des options supplémentaires.","freeText":"Offre gratuite : outils essentiels + publicités.","weekly":"Hebdomadaire","weeklyText":"Premium pendant une semaine.","monthly":"Mensuel","monthlyText":"Premium pendant un mois.","yearly":"Annuel","yearlyText":"Meilleur prix pour un an.","subscribe":"S’abonner","plan":"Offre :","free":"Gratuit","wait":"Veuillez patienter…","signinSub":"Connectez-vous d’abord pour vous abonner.","db":"La base de données des comptes doit d’abord être activée dans Cloudflare.","exists":"Cette adresse e-mail est déjà enregistrée.","badLogin":"E-mail ou mot de passe incorrect.","weak":"Le mot de passe doit comporter au moins 8 caractères.","error":"Une erreur s’est produite. Réessayez.","created":"Compte créé","signed":"Connexion réussie","language":"Langue"},"bn":{"store":"স্টোর","signin":"সাইন ইন","account":"অ্যাকাউন্ট","register":"অ্যাকাউন্ট তৈরি","name":"নাম","email":"ইমেইল","password":"পাসওয়ার্ড","create":"অ্যাকাউন্ট তৈরি","logout":"সাইন আউট","storeTitle":"SmartTools AI স্টোর","intro":"বিজ্ঞাপনসহ বিনামূল্যে SmartTools AI ব্যবহার করুন, অথবা বিজ্ঞাপন সরিয়ে অতিরিক্ত সুবিধা পেতে Premium নিন।","freeText":"বিনামূল্যের প্ল্যান: মূল টুল + বিজ্ঞাপন।","weekly":"সাপ্তাহিক","weeklyText":"এক সপ্তাহের জন্য Premium।","monthly":"মাসিক","monthlyText":"এক মাসের জন্য Premium।","yearly":"বার্ষিক","yearlyText":"এক বছরের সেরা মূল্য।","subscribe":"সাবস্ক্রাইব","plan":"প্ল্যান:","free":"বিনামূল্যে","wait":"একটু অপেক্ষা করুন…","signinSub":"সাবস্ক্রাইব করতে আগে সাইন ইন করুন।","db":"আগে Cloudflare-এ অ্যাকাউন্ট ডেটাবেস চালু করতে হবে।","exists":"এই ইমেইল আগে থেকেই নিবন্ধিত।","badLogin":"ইমেইল বা পাসওয়ার্ড ভুল।","weak":"পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।","error":"সমস্যা হয়েছে। আবার চেষ্টা করুন।","created":"অ্যাকাউন্ট তৈরি হয়েছে","signed":"সাইন ইন সফল","language":"ভাষা"}};
   function localizeAccountStore(){
-    const en=isEn();
-    if(storeBtn) storeBtn.textContent=en?'Store':'المتجر';
-    accountBtn.textContent=currentUser?(currentUser.name||currentUser.email):(en?'Sign in':'دخول');
-    q('#stAuthTitle').textContent=en?'Account':'الحساب';
-    q('#stLoginTab').textContent=en?'Sign in':'تسجيل الدخول';
-    q('#stRegisterTab').textContent=en?'Create account':'إنشاء حساب';
-    q('#stNameField span').textContent=en?'Name':'الاسم';
-    q('#stEmailLabel').textContent=en?'Email':'البريد الإلكتروني';
-    q('#stPasswordLabel').textContent=en?'Password':'كلمة المرور';
-    q('#stAuthSubmit').textContent=mode==='login'?(en?'Sign in':'دخول'):(en?'Create account':'إنشاء الحساب');
-    q('#stLogout').textContent=en?'Sign out':'تسجيل الخروج';
-    q('#stStoreTitle').textContent=en?'SmartTools AI Store':'متجر SmartTools AI';
-    q('#stStoreIntro').textContent=en?'Use SmartTools AI free with ads, or choose Premium to remove ads and unlock extra benefits.':'استخدم التطبيق مجاناً مع الإعلانات، أو اختر Premium لإزالة الإعلانات وفتح المزايا الإضافية.';
-    q('#stFreeText').textContent=en?'Free plan: core tools + ads.':'الخطة المجانية: جميع الأدوات الأساسية + إعلانات.';
-    q('#stWeeklyName').textContent=en?'Weekly':'أسبوعي';q('#stWeeklyText').textContent=en?'Premium for one week.':'Premium لمدة أسبوع.';
-    q('#stMonthlyName').textContent=en?'Monthly':'شهري';q('#stMonthlyText').textContent=en?'Premium for one month.':'Premium لمدة شهر.';
-    q('#stYearlyName').textContent=en?'Yearly':'سنوي';q('#stYearlyText').textContent=en?'Best value for one year.':'أفضل قيمة لمدة سنة.';
-    document.querySelectorAll('.st-buy').forEach(b=>b.textContent=en?'Subscribe':'اشترك');
-    if(currentUser){q('#stUserPlan').textContent=(en?'Plan: ':'الخطة: ')+(currentUser.plan==='free'?(en?'Free':'مجانية'):currentUser.plan)}
+    const en=isEn(), w=ACCOUNT_WORDS[typeof lang!=='undefined'?lang:'ar'];
+    if(storeBtn) storeBtn.textContent=w?.store||(en?'Store':'المتجر');
+    accountBtn.textContent=currentUser?(currentUser.name||currentUser.email):(w?.signin||(en?'Sign in':'دخول'));
+    q('#stAuthTitle').textContent=w?.account||(en?'Account':'الحساب');
+    q('#stLoginTab').textContent=w?.signin||(en?'Sign in':'تسجيل الدخول');
+    q('#stRegisterTab').textContent=w?.register||(en?'Create account':'إنشاء حساب');
+    q('#stNameField span').textContent=w?.name||(en?'Name':'الاسم');
+    q('#stEmailLabel').textContent=w?.email||(en?'Email':'البريد الإلكتروني');
+    q('#stPasswordLabel').textContent=w?.password||(en?'Password':'كلمة المرور');
+    q('#stAuthSubmit').textContent=mode==='login'?(w?.signin||(en?'Sign in':'دخول')):(w?.create||(en?'Create account':'إنشاء الحساب'));
+    q('#stLogout').textContent=w?.logout||(en?'Sign out':'تسجيل الخروج');
+    q('#stStoreTitle').textContent=w?.storeTitle||(en?'SmartTools AI Store':'متجر SmartTools AI');
+    q('#stStoreIntro').textContent=w?.intro||(en?'Use SmartTools AI free with ads, or choose Premium to remove ads and unlock extra benefits.':'استخدم التطبيق مجاناً مع الإعلانات، أو اختر Premium لإزالة الإعلانات وفتح المزايا الإضافية.');
+    q('#stFreeText').textContent=w?.freeText||(en?'Free plan: core tools + ads.':'الخطة المجانية: جميع الأدوات الأساسية + إعلانات.');
+    q('#stWeeklyName').textContent=w?.weekly||(en?'Weekly':'أسبوعي');q('#stWeeklyText').textContent=w?.weeklyText||(en?'Premium for one week.':'Premium لمدة أسبوع.');
+    q('#stMonthlyName').textContent=w?.monthly||(en?'Monthly':'شهري');q('#stMonthlyText').textContent=w?.monthlyText||(en?'Premium for one month.':'Premium لمدة شهر.');
+    q('#stYearlyName').textContent=w?.yearly||(en?'Yearly':'سنوي');q('#stYearlyText').textContent=w?.yearlyText||(en?'Best value for one year.':'أفضل قيمة لمدة سنة.');
+    document.querySelectorAll('.st-buy').forEach(b=>b.textContent=w?.subscribe||(en?'Subscribe':'اشترك'));
+    if(currentUser){q('#stUserPlan').textContent=(w?.plan||(en?'Plan: ':'الخطة: '))+(currentUser.plan==='free'?(w?.free||(en?'Free':'مجانية')):currentUser.plan)}
   }
-
   function show(which){
     wrap.classList.remove('hidden');
     q('#stAuthModal').classList.toggle('hidden',which!=='auth');
@@ -94,6 +96,7 @@
   function hide(){wrap.classList.add('hidden');q('#stAuthModal').classList.add('hidden');q('#stStoreModal').classList.add('hidden')}
   wrap.addEventListener('click',e=>{if(e.target===wrap||e.target.closest('[data-close]'))hide()});
   document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()});
+  document.addEventListener('smarttools-language-change',localizeAccountStore);
 
   function setMode(next){
     mode=next;
@@ -136,7 +139,7 @@
   q('#stAuthSubmit').onclick=async()=>{
     const status=q('#stAuthStatus');
     const name=q('#stName').value.trim(),email=q('#stEmail').value.trim(),password=q('#stPassword').value;
-    status.textContent=isEn()?'Please wait…':'لحظة…';
+    status.textContent=accountText('wait',isEn()?'Please wait…':'لحظة…');
     try{
       const body=mode==='register'?{name,email,password}:{email,password};
       const d=await api('/api/auth/'+(mode==='register'?'register':'login'),{method:'POST',body:JSON.stringify(body)});
@@ -144,11 +147,11 @@
       await refreshUser();
       status.textContent='';
     }catch(e){
-      if(e.code==='accounts_not_configured') status.textContent=isEn()?'Account database needs to be enabled in Cloudflare first.':'نحتاج نفعّل قاعدة بيانات الحسابات في Cloudflare أولاً.';
-      else if(e.code==='email_exists') status.textContent=isEn()?'This email is already registered.':'هذا البريد مسجل من قبل.';
-      else if(e.code==='invalid_login') status.textContent=isEn()?'Email or password is incorrect.':'البريد أو كلمة المرور غير صحيحة.';
-      else if(e.code==='weak_password') status.textContent=isEn()?'Password must be at least 8 characters.':'كلمة المرور لازم تكون 8 أحرف على الأقل.';
-      else status.textContent=e.message||((isEn()?'Something went wrong.':'صار خطأ، جرّب مرة ثانية.'));
+      if(e.code==='accounts_not_configured') status.textContent=accountText('db',isEn()?'Account database needs to be enabled in Cloudflare first.':'نحتاج نفعّل قاعدة بيانات الحسابات في Cloudflare أولاً.');
+      else if(e.code==='email_exists') status.textContent=accountText('exists',isEn()?'This email is already registered.':'هذا البريد مسجل من قبل.');
+      else if(e.code==='invalid_login') status.textContent=accountText('badLogin',isEn()?'Email or password is incorrect.':'البريد أو كلمة المرور غير صحيحة.');
+      else if(e.code==='weak_password') status.textContent=accountText('weak',isEn()?'Password must be at least 8 characters.':'كلمة المرور لازم تكون 8 أحرف على الأقل.');
+      else status.textContent=accountText('error',isEn()?'Something went wrong.':'صار خطأ، جرّب مرة ثانية.');
     }
   };
 
@@ -158,7 +161,7 @@
     await refreshUser();
     const status=q('#stStoreStatus');
     if(!currentUser){
-      status.textContent=isEn()?'Sign in first to subscribe.':'سجّل دخولك أولاً للاشتراك.';
+      status.textContent=accountText('signinSub',isEn()?'Sign in first to subscribe.':'سجّل دخولك أولاً للاشتراك.');
       setTimeout(()=>show('auth'),500);
       return;
     }
