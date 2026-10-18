@@ -1,6 +1,6 @@
 import { Env, ChatMessage } from "./types";
 
-const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
+const MODEL_ID = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const VISION_MODEL_ID = "@cf/meta/llama-3.2-11b-vision-instruct";
 const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
 const SYSTEM_PROMPT =
